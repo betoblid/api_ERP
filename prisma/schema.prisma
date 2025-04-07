@@ -1,0 +1,256 @@
+// Gerador do Prisma Client e conexão com o banco de dados PostgreSQL
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum para controle de acesso do usuário
+enum Role {
+  admin
+  gerente
+  usuario
+}
+
+// Enum para os tipos de ponto (registro de jornada)
+enum TipoPonto {
+  entrada
+  almoco_inicio
+  almoco_fim
+  saida
+}
+
+// Enum para o status dos pedidos
+enum StatusPedido {
+  agendado
+  em_andamento
+  concluido
+  cancelado
+}
+
+// Enum para tipo de movimentação do estoque
+enum TipoMovimentacao {
+  entrada
+  saida
+}
+
+// =================================================
+// Modelo de Usuário – Controle de acesso e vinculação com funcionário
+// =================================================
+model Usuario {
+  id            Int          @id @default(autoincrement())
+  username      String       @unique
+  email         String       @unique
+  password      String
+  role          Role         @default(usuario)
+  ativo         Boolean      @default(true)
+  funcionario   Funcionario? @relation(fields: [funcionarioId], references: [id])
+  funcionarioId Int?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+// =================================================
+// Modelo de Funcionário – Dados pessoais, registro de ponto, OS, etc.
+// =================================================
+model Funcionario {
+  id             Int             @id @default(autoincrement())
+  nome           String
+  cpf            String          @unique
+  cargo          String
+  email          String          @unique
+  // Pode usar 'jornadaInicio' e 'jornadaFim' ou 'horarioTrabalho'
+  jornadaInicio  String
+  jornadaFim     String
+  // Relação com Usuário – um funcionário pode ter um ou mais usuários vinculados, se necessário
+  usuarios       Usuario[]
+  // Relações com demais funcionalidades
+  pontos         Ponto[]
+  ordensServico  OrdemServico[]
+  checkPoints    CheckPoint[]
+  retiradas      RetiradaProduto[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+// =================================================
+// Modelo de Ponto – Registro dos horários do funcionário
+// =================================================
+model Ponto {
+  id             Int           @id @default(autoincrement())
+  tipo           TipoPonto
+  timestamp      DateTime      @default(now())
+  funcionario    Funcionario   @relation(fields: [funcionarioId], references: [id])
+  funcionarioId  Int
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+// =================================================
+// Modelo de Cliente – Cadastro de clientes para pedidos ou ordens de serviço
+// =================================================
+model Cliente {
+  id             Int            @id @default(autoincrement())
+  nome           String
+  tipoDocumento  String
+  documento      String         @unique
+  endereco       String
+  telefone       String
+  email          String
+  pedidos        Pedido[]
+  // Ordens de serviço também podem estar vinculadas a um cliente
+  ordensServico  OrdemServico[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+// =================================================
+// Modelo de Categoria – Agrupamento de produtos
+// =================================================
+model Categoria {
+  id         Int         @id @default(autoincrement())
+  nome       String      @unique
+  produtos   Produto[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// =================================================
+// Modelo de Produto – Dados do produto e controle de estoque
+// =================================================
+model Produto {
+  id              Int                   @id @default(autoincrement())
+  nome            String
+  codigoBarras    String                @unique
+  preco           Float
+  estoqueAtual    Int                   // estoque atual
+  estoqueMinimo   Int                   @default(10)
+  fornecedor      String
+  // Relação com Categoria
+  categoria       Categoria             @relation(fields: [categoriaId], references: [id])
+  categoriaId     Int
+  // Relações com pedidos e ordens de serviço
+  itensPedido     ItemPedido[]
+  ordensProduto   OrdemServicoProduto[]
+  // Controle de movimentação de estoque
+  estoque         Estoque[]
+  retiradas       RetiradaProduto[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+}
+
+// =================================================
+// Modelo de Pedido – Pedido de um cliente
+// =================================================
+model Pedido {
+  id           Int           @id @default(autoincrement())
+  numero       String        @unique
+  status       StatusPedido  @default(agendado)
+  data         DateTime      @default(now())
+  horario      String
+  endereco     String
+  // Relação com Cliente
+  cliente      Cliente       @relation(fields: [clienteId], references: [id])
+  clienteId    Int
+  itens        ItemPedido[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// =================================================
+// Modelo de ItemPedido – Itens contidos em um Pedido
+// =================================================
+model ItemPedido {
+  id             Int       @id @default(autoincrement())
+  quantidade     Int
+  precoUnitario  Float
+  pedido         Pedido    @relation(fields: [pedidoId], references: [id])
+  pedidoId       Int
+  produto        Produto   @relation(fields: [produtoId], references: [id])
+  produtoId      Int
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([pedidoId, produtoId])
+}
+
+// =================================================
+// Modelo de Ordem de Serviço – Atividades de serviço realizadas
+// =================================================
+model OrdemServico {
+  id               Int                    @id @default(autoincrement())
+  // Relacionamento com Cliente (pode ser o mesmo cadastro de cliente)
+  cliente          Cliente                @relation(fields: [clienteId], references: [id])
+  clienteId        Int
+  // Relacionamento com o funcionário responsável
+  funcionario      Funcionario            @relation(fields: [funcionarioId], references: [id])
+  funcionarioId    Int
+  status           String                 // ex.: "aberta", "andamento", "finalizada"
+  dataAbertura     DateTime               @default(now())
+  dataConclusao    DateTime?
+  localExecucao    String
+  // Relações para produtos usados, check-ins e retiradas
+  produtos         OrdemServicoProduto[]
+  checkPoints      CheckPoint[]
+  retiradas        RetiradaProduto[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+}
+
+// =================================================
+// Modelo de OrdemServicoProduto – Produtos utilizados na OS
+// =================================================
+model OrdemServicoProduto {
+  id               Int              @id @default(autoincrement())
+  ordemServico     OrdemServico     @relation(fields: [ordemServicoId], references: [id])
+  ordemServicoId   Int
+  produto          Produto          @relation(fields: [produtoId], references: [id])
+  produtoId        Int
+  quantidade       Int
+}
+
+// =================================================
+// Modelo de Estoque – Movimentações de estoque (entrada/saída)
+// =================================================
+model Estoque {
+  id                Int              @id @default(autoincrement())
+  produto           Produto          @relation(fields: [produtoId], references: [id])
+  produtoId         Int
+  tipoMovimentacao  TipoMovimentacao // "entrada" ou "saida"
+  quantidade        Int
+  dataMovimentacao  DateTime         @default(now())
+}
+
+// =================================================
+// Modelo de CheckPoint – Registro de check-in/check-out em OS
+// =================================================
+model CheckPoint {
+  id                Int              @id @default(autoincrement())
+  ordemServico      OrdemServico     @relation(fields: [ordemServicoId], references: [id])
+  ordemServicoId    Int
+  funcionario       Funcionario      @relation(fields: [funcionarioId], references: [id])
+  funcionarioId     Int
+  tipo              String           // ex.: "check-in" ou "check-out"
+  dataHora          DateTime         @default(now())
+  latitude          Float
+  longitude         Float
+}
+
+// =================================================
+// Modelo de RetiradaProduto – Confirmação de retirada de produtos na OS
+// =================================================
+model RetiradaProduto {
+  id                     Int              @id @default(autoincrement())
+  ordemServico           OrdemServico     @relation(fields: [ordemServicoId], references: [id])
+  ordemServicoId         Int
+  produto                Produto          @relation(fields: [produtoId], references: [id])
+  produtoId              Int
+  funcionario            Funcionario      @relation(fields: [funcionarioId], references: [id])
+  funcionarioId          Int
+  dataHora               DateTime         @default(now())
+  codigoBarrasEscaneado  String
+  statusVerificacao      String           // ex.: "sucesso" ou "erro"
+}
