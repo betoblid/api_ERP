@@ -7,6 +7,7 @@ Dotenv.config();
 const EnvSchame = z.object({
     PORT: z.string().regex(/^\d+$/, { message: 'PORT deve ser um número' }),
     DATABASE_URL: z.string().url(),
+    JWT_SECRET: z.string().min(1, "JWT_SECRET não definido nas variáveis de ambiente.")
 });
 
 const parseEnv = EnvSchame.safeParse(process.env);
