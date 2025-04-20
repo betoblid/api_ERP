@@ -1,0 +1,31 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const usuario_routes_1 = __importDefault(require("./routes/usuario.routes"));
+const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const cliente_routes_1 = __importDefault(require("./routes/cliente.routes"));
+const categoria_route_1 = __importDefault(require("./routes/categoria.route"));
+const ponto_routes_1 = __importDefault(require("./routes/ponto.routes"));
+const pedido_routes_1 = __importDefault(require("./routes/pedido.routes"));
+const produto_routes_1 = __importDefault(require("./routes/produto.routes"));
+const funcionario_routes_1 = __importDefault(require("./routes/funcionario.routes"));
+const ordem_routes_1 = __importDefault(require("./routes/ordem.routes"));
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)());
+app.use(express_1.default.json());
+app.use(auth_routes_1.default);
+app.use(usuario_routes_1.default);
+app.use(cliente_routes_1.default);
+app.use(categoria_route_1.default);
+app.use(ponto_routes_1.default);
+app.use(pedido_routes_1.default);
+app.use(produto_routes_1.default);
+app.use(funcionario_routes_1.default);
+app.use(ordem_routes_1.default);
+app.listen(3011, () => {
+    console.log('Server is running on http://localhost:3011');
+});

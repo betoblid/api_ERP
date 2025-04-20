@@ -10,7 +10,7 @@ export class CategoriaController {
                 orderBy: { nome: "asc" },
             })
 
-            res.json(categorias);
+            res.status(200).json(categorias);
             return;
         } catch (error) {
             console.error("Get all categorias error:", error)

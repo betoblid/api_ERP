@@ -42,7 +42,7 @@ export const verifyToken = async (
       username: user.username,
       email: user.email,
       role: user.role,
-      funcionarioId: user.funcionarioId,
+      funcionarioId: user.funcionarioId ?? undefined,
       funcionario: user.funcionario,
     }
 

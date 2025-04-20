@@ -37,6 +37,19 @@ enum TipoMovimentacao {
   saida
 }
 
+// Enum para tipos de ocorrências (entrega ou retirada)
+enum TipoOcorrencia {
+  entrega
+  retirada
+}
+
+// Enum para status de ocorrências
+enum StatusOcorrencia {
+  pendente
+  finalizado
+  cancelado
+}
+
 // =================================================
 // Modelo de Usuário – Controle de acesso e vinculação com funcionário
 // =================================================
@@ -146,18 +159,38 @@ model Produto {
 // Modelo de Pedido – Pedido de um cliente
 // =================================================
 model Pedido {
-  id        Int          @id @default(autoincrement())
-  numero    String       @unique
-  status    StatusPedido @default(agendado)
-  data      DateTime     @default(now())
-  horario   String
-  endereco  String
+  id          Int          @id @default(autoincrement())
+  status      StatusPedido @default(agendado)
+  data        DateTime     @default(now())
+  horario     String
+  endereco    String
   // Relação com Cliente
-  cliente   Cliente      @relation(fields: [clienteId], references: [id])
-  clienteId Int
-  itens     ItemPedido[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  cliente     Cliente      @relation(fields: [clienteId], references: [id])
+  clienteId   Int
+  itens       ItemPedido[]
+  ocorrencias Ocorrencia[] // relacionamento 1:N
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// =================================================
+// Modelo de Ocorrência – Registro de ocorrências durante a entrega ou retirada
+// =================================================
+model Ocorrencia {
+  id          Int              @id @default(autoincrement())
+  tipo        TipoOcorrencia  // entrega ou retirada
+  recebidoPor String
+  data        DateTime
+  horario     String  
+  local       String
+  observacao  String?
+  status      StatusOcorrencia @default(finalizado)
+
+  pedidoId      Int
+  pedido        Pedido   @relation(fields: [pedidoId], references: [id])
+  funcionarioId Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // =================================================
@@ -181,23 +214,27 @@ model ItemPedido {
 // Modelo de Ordem de Serviço – Atividades de serviço realizadas
 // =================================================
 model OrdemServico {
-  id            Int                   @id @default(autoincrement())
+  id              Int                   @id @default(autoincrement())
   // Relacionamento com Cliente (pode ser o mesmo cadastro de cliente)
-  cliente       Cliente               @relation(fields: [clienteId], references: [id])
-  clienteId     Int
+  cliente         Cliente               @relation(fields: [clienteId], references: [id])
+  clienteId       Int
   // Relacionamento com o funcionário responsável
-  funcionario   Funcionario           @relation(fields: [funcionarioId], references: [id])
-  funcionarioId Int
-  status        String // ex.: "aberta", "andamento", "finalizada"
-  dataAbertura  DateTime              @default(now())
-  dataConclusao DateTime?
-  localExecucao String
+  funcionario     Funcionario           @relation(fields: [funcionarioId], references: [id])
+  funcionarioId   Int
+  status          String // ex.: "aberta", "andamento", "finalizada"
+  dataAbertura    DateTime              @default(now())
+  dataAgendado    DateTime
+  dataConclusao   DateTime?
+  localExecucao   String
+  titulo          String
+  descricao       String?
+  horarioExecucao String
   // Relações para produtos usados, check-ins e retiradas
-  produtos      OrdemServicoProduto[]
-  checkPoints   CheckPoint[]
-  retiradas     RetiradaProduto[]
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  produtos        OrdemServicoProduto[]
+  checkPoints     CheckPoint[]
+  retiradas       RetiradaProduto[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 // =================================================

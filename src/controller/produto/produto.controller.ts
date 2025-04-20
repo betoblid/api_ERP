@@ -65,10 +65,12 @@ export class ProdutoController {
           nome,
           codigoBarras,
           preco: Number(preco),
-          estoqueAtual: Number(estoqueAtual),
+          estoqueAtual: parseInt(estoqueAtual),
           estoqueMinimo: estoqueMinimo ? Number(estoqueMinimo) : 10,
           fornecedor,
-          categoriaId: Number(categoriaId),
+          categoria: {
+            connect: { id: 10 } // <- CORRETO
+          },
         },
         include: { categoria: true },
       })

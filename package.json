@@ -1,12 +1,15 @@
 {
-  "name": "api",
-  "version": "1.0.0",
-  "description": "api para ERP",
+  "name": "api_ERP",
+  "version": "1.1.0",
+  "description": "api para um sistema de ERP",
   "main": "server.ts",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc --build",
+    "start": "node ./dist/server.js",
+    "vercel-build": "prisma generate && prisma migrate deploy"
   },
-  "author": "",
+  "author": "Beto Souza",
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^6.5.0",

@@ -9,8 +9,11 @@ export class PedidoController {
                 include: {
                     cliente: true,
                     itens: {
-                        include: { produto: true },
+                        include: { 
+                            produto: true,
+                          },    
                     },
+                    ocorrencias: true
                 },
                 orderBy: { data: "desc" },
             })
@@ -48,7 +51,7 @@ export class PedidoController {
 
     static async criar(req: Request, res: Response) {
         try {
-            const { numero, status, data, horario, endereco, clienteId, itens } = req.body
+            const { status, data, horario, endereco, clienteId, itens } = req.body
 
             const cliente = await prisma.cliente.findUnique({ where: { id: Number(clienteId) } })
             if (!cliente) {
@@ -56,11 +59,11 @@ export class PedidoController {
                 return;
             }
 
-            const existente = await prisma.pedido.findFirst({ where: { numero } })
-            if (existente) {
-                res.status(400).json({ message: "Número de pedido já existe" });
-                return;
-            }
+            // const existente = await prisma.pedido.findFirst({ where: { numero } })
+            // if (existente) {
+            //     res.status(400).json({ message: "Número de pedido já existe" });
+            //     return;
+            // }
 
             if (!itens || !Array.isArray(itens) || itens.length === 0) {
                 res.status(400).json({ message: "Pedido deve ter pelo menos um item" });
@@ -68,7 +71,7 @@ export class PedidoController {
             }
 
             for (const item of itens) {
-                const produto = await prisma.produto.findUnique({ where: { id: Number(item.produtoId) } })
+                const produto = await prisma.produto.findUnique({ where: { id: Number(item.id) } })
                 if (!produto) {
                     res.status(404).json({ message: `Produto ID ${item.produtoId} não encontrado` });
                     return;
@@ -81,7 +84,6 @@ export class PedidoController {
 
             const novoPedido = await prisma.pedido.create({
                 data: {
-                    numero,
                     status,
                     data: data ? new Date(data) : undefined,
                     horario,
@@ -90,8 +92,8 @@ export class PedidoController {
                     itens: {
                         create: itens.map((item) => ({
                             quantidade: Number(item.quantidade),
-                            precoUnitario: Number(item.precoUnitario),
-                            produtoId: Number(item.produtoId),
+                            precoUnitario: Number(item.preco),
+                            produtoId: Number(item.id),
                         })),
                     },
                 },
@@ -101,21 +103,21 @@ export class PedidoController {
                 },
             })
 
-            for (const item of itens) {
-                const quantidade = Number(item.quantidade)
-                await prisma.produto.update({
-                    where: { id: Number(item.produtoId) },
-                    data: { estoqueAtual: { decrement: quantidade } },
-                })
-                await prisma.estoque.create({
-                    data: {
-                        tipoMovimentacao: TipoMovimentacao.saida,
-                        quantidade,
-                        produtoId: Number(item.produtoId),
-                        descricao: `Pedido nº ${numero} realizado`,
-                    },
-                })
-            }
+            // for (const item of itens) {
+            //     const quantidadeItem = Number(quantidade)
+            //     await prisma.produto.update({
+            //         where: { id: Number(item.produtoId) },
+            //         data: { estoqueAtual: { decrement: quantidadeItem } },
+            //     })
+            //     await prisma.estoque.create({
+            //         data: {
+            //             tipoMovimentacao: TipoMovimentacao.saida,
+            //             quantidade,
+            //             produtoId: Number(item.id),
+            //             descricao: `Pedido nº ${numero} realizado`,
+            //         },
+            //     })
+            // }
 
             res.status(201).json({ message: "Pedido criado com sucesso", pedido: novoPedido });
             return;
@@ -155,6 +157,73 @@ export class PedidoController {
         }
     }
 
+    static async finalizarPedido(req: Request, res: Response) {
+        try {
+            const { id } = req.params
+            const { horario, data, recebido, tipo, local, observacao, pedidoid, funcionarioId } = req.body;
+
+            //validar se tem payload
+            if (!horario || !data || !recebido || !tipo || !local || !observacao || !pedidoid) {
+                res.status(400).json({ message: "Dados incompletos para finalizar o pedido" });
+                return;
+            }
+
+            //validar se o pedido existe
+            const pedido = await prisma.pedido.findUnique({ where: { id: Number(pedidoid) } })
+            if (!pedido) {
+                res.status(404).json({ message: "Pedido não encontrado" });
+                return;
+            }
+
+            const atualizado = await prisma.pedido.update({
+                where: { id: Number(pedidoid) },
+                data: { status: "concluido" },
+                include: {
+                    cliente: true,
+                    itens: { include: { produto: true } },
+                },
+            });
+
+            for (const item of atualizado.itens) {
+                const quantidadeItem = Number(item.quantidade)
+
+                await prisma.produto.update({
+                    where: { id: item.produtoId },
+                    data: { estoqueAtual: { decrement: quantidadeItem } },
+                })
+                await prisma.estoque.create({
+                    data: {
+                        tipoMovimentacao: TipoMovimentacao.saida,
+                        quantidade: quantidadeItem,
+                        produtoId: item.produtoId,
+                        descricao: `Pedido nº ${atualizado.id} realizado`,
+                    },
+                })
+            }
+
+            await prisma.ocorrencia.create({
+                data: {
+                    horario,
+                    data: data,
+                    recebidoPor: recebido,
+                    tipo,
+                    local,
+                    observacao,
+                    pedidoId: Number(id),
+                    funcionarioId: Number(funcionarioId),
+                },
+            })
+
+            res.json({ message: "Pedido finalizado com sucesso.", pedido: atualizado });
+            return;
+        } catch (error) {
+            console.error("Erro ao atualizar status:", error)
+            res.status(500).json({ message: "Erro ao atualizar status do pedido" });
+            return;
+        }
+    }
+
+
     static async deletar(req: Request, res: Response) {
         try {
             const { id } = req.params
@@ -168,25 +237,25 @@ export class PedidoController {
                 return;
             }
 
-            await prisma.$transaction(async (tx) => {
-                for (const item of pedido.itens) {
-                    await tx.produto.update({
-                        where: { id: item.produtoId },
-                        data: { estoqueAtual: { increment: item.quantidade } },
-                    })
-                    await tx.estoque.create({
-                        data: {
-                            tipoMovimentacao: TipoMovimentacao.entrada,
-                            quantidade: item.quantidade,
-                            produtoId: item.produtoId,
-                            descricao: `Reversão de pedido nº ${pedido.numero}`,
-                        },
-                    })
-                }
+            // await prisma.$transaction(async (tx) => {
+            //     for (const item of pedido.itens) {
+            //         await tx.produto.update({
+            //             where: { id: item.produtoId },
+            //             data: { estoqueAtual: { increment: item.quantidade } },
+            //         })
+            //         await tx.estoque.create({
+            //             data: {
+            //                 tipoMovimentacao: TipoMovimentacao.entrada,
+            //                 quantidade: item.quantidade,
+            //                 produtoId: item.produtoId,
+            //                 descricao: `Reversão de pedido nº ${pedido.numero}`,
+            //             },
+            //         })
+            //     }
 
-                await tx.itemPedido.deleteMany({ where: { pedidoId: pedido.id } })
-                await tx.pedido.delete({ where: { id: pedido.id } })
-            })
+            //     await tx.itemPedido.deleteMany({ where: { pedidoId: pedido.id } })
+            //     await tx.pedido.delete({ where: { id: pedido.id } })
+            // })
 
             res.json({ message: "Pedido excluído com sucesso" });
             return;
